@@ -1,0 +1,54 @@
+name: iOS build (unsigned IPA)
+
+on:
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: 3.35.2
+  FLUTTER_CHANNEL: master
+
+jobs:
+  ios:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2.18.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+          git-source: https://github.com/flutter/flutter.git
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "16.2"
+
+      - name: Install iOS dependencies
+        run: |
+          flutter pub get
+          dart cli/cli.dart install-dependencies --platform=ios --arch=all
+
+      - name: Build iOS (no codesign)
+        run: dart cli/cli.dart build --arch=all ios
+        env:
+          CHANNEL: nightly
+          # Placeholder .env: the app only needs these keys to exist at build time.
+          # Last.fm scrobbling will not work with dummy values.
+          DOTENV: |
+            LASTFM_API_KEY=dummy
+            LASTFM_API_SECRET=dummy
+            ENABLE_UPDATE_CHECK=0
+            HIDE_DONATIONS=0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: Spotube-iOS-ipa
+          path: Spotube-iOS.ipa
